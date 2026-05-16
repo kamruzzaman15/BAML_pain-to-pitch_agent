@@ -147,7 +147,7 @@ drafted a short outreach message that points at this exact pattern. See
 
 ---
 
-## Honest limitations
+## Limitations
 
 - The BAML rewrite runs on a small local model, so it sometimes copies the
   reference schema instead of inferring fields from the real code. The
