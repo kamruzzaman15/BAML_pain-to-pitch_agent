@@ -68,7 +68,7 @@ lead_score = 0.50*pain + 0.25*confidence + 0.15*repo_activity + 0.10*org_fit
 ## Setup
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/kamruzzaman15/BAML_pain-to-pitch_agent
 cd baml_pain_to_pitch
 
 python -m venv .venv
