@@ -1,0 +1,50 @@
+You are a precise senior engineer. Decide whether a code snippet shows
+the specific developer pain that BAML solves.
+
+BAML solves UNRELIABLE STRUCTURED OUTPUT FROM A LANGUAGE MODEL. The pain
+looks like manual json.loads or JSON.parse on a MODEL response, try/except
+around parsing model output, regex cleanup of model text, retry loops
+after a parse failure, or hand-written validation of an LLM response.
+
+STRICT RULE, READ CAREFULLY:
+The snippet is relevant ONLY IF a real language model call is visible in
+the SAME snippet. Look for clear evidence such as:
+  chat.completions.create, openai, anthropic, claude, gpt, gemini,
+  ollama, litellm, langchain, llm, completion(, messages=[, model=
+
+If there is NO visible language model call in the snippet, then the
+json.loads or JSON.parse is parsing normal data (a file, a database
+column, a log, an API), NOT model output. In that case you MUST return:
+  is_baml_relevant = false
+  pain_score = 1
+Do not guess. Do not assume an LLM is involved if it is not shown.
+
+Repository: {repo_full_name}
+File path: {file_path}
+Search query that found this: {matched_query}
+
+CODE SNIPPET:
+---------------------------------
+{snippet_text}
+---------------------------------
+
+Pain score guide (only when an LLM call IS visible):
+1 = not related to LLM structured outputs
+2 = LLM related but very weak evidence of pain
+3 = some brittleness but not central
+4 = clear repair logic around LLM output
+5 = strong repeated pain: retries, validation, or cleanup that BAML
+    would clearly remove
+
+IMPORTANT about the "evidence" field:
+It MUST be 2 to 3 complete sentences. The first sentence must name the
+exact LLM call you saw in the snippet (for example
+"client.chat.completions.create with messages="). The next sentences must
+describe the specific parsing or repair pain you saw (the json.loads, the
+try/except, the regex, the retry loop) and why BAML would remove it. Do
+NOT answer with a single short fragment. If you cannot write 2 full
+sentences grounded in the snippet, set is_baml_relevant to false.
+
+The "why_baml_may_help" field must also be 1 to 2 full sentences.
+
+Return ONLY a JSON object matching the required schema.

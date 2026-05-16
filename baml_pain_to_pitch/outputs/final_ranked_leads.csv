@@ -1,0 +1,942 @@
+lead_rank,repo_full_name,owner,owner_type,file_path,repo_url,file_url,language,pain_type,use_case,pain_score,confidence,evidence,why_baml_may_help,repo_stars,days_since_push,is_archived,repo_activity_score,org_fit_score,lead_score,fix_summary,baml_schema_or_function,example_client_usage,limits,outreach_message,tone_check,snippet_text
+1,justLV/onju-voice,justLV,User,server/llm.py,https://github.com/justLV/onju-voice,https://github.com/justLV/onju-voice/blob/0dbcb106c50622e02702c9425672523b1bc6aa4e/server/llm.py,Jupyter Notebook,retry_logic,chatbot,5,1.0,"The code snippet includes an explicit call to `openai.ChatCompletion.create` with messages, which is a clear indication of an interaction with a language model. The pain in this case is the presence of retry logic around the LLM response parsing, including try/except blocks and exponential backoff for retries. This brittleness is indicative of unreliable structured output from the LLM.","BAML would help by automating the process of retrying failed requests, handling exceptions gracefully, and ensuring that the structured output from the language model is correctly parsed without manual intervention.",1664,32,False,4.0,3.0,4.65,"This BAML rewrite removes the manual retry logic and JSON parsing, simplifying the code by leveraging the typed object returned directly from the client.","// Define the typed result as a BAML class
+class ChatCompletionResult {
+  success bool
+  response any
+}
+
+// Define a BAML function with a client and a prompt
+function CallGPTRetry(device: Device, max_retries int = 4, include_functions bool = false) -> ChatCompletionResult {
+  client ""openai/gpt-3.5-turbo""
+  prompt #""""""
+    You are an assistant that handles retries for GPT API calls.
+    Return the success status and response.
+
+    Device: {{ device }}
+    Max Retries: {{ max_retries }}
+    Include Functions: {{ include_functions }}
+  """"#}
+}","result = CallGPTRetry(device, max_retries=4, include_functions=True)
+if result.success:
+  print(result.response)
+else:
+  print(f'Failed after {max_retries} attempts')",This BAML rewrite assumes that the `Device` class and its attributes are already defined elsewhere in the codebase. It also assumes that the `openai/gpt-3.5-turbo` model is available for use.,"This looked like an area where BAML could simplify things. By automating retries and handling exceptions, you might find the code cleaner and more maintainable.",helpful,"from datetime import datetime, timedelta
+from dateutil import tz
+
+import openai
+from rich import print
+
+import devices
+
+openai.api_key = os.getenv(""OPENAI_API_KEY"")
+
+class OpenAIFunctionCalling:
+    def __init__(self, config):
+        self.config = config
+        self.functions = self.setup_functions()
+
+    def call_gpt_retry(self, device, max_retries=4, include_functions=False):
+        wait_time = 0.5
+        for attempt in range(max_retries):
+            try:
+                if(include_functions):
+                    response = openai.ChatCompletion.create(
+                        model=self.config['llm']['gpt_model'],
+                        messages=device.messages,
+                        functions=self.functions,
+                        max_tokens=300,
+                    )
+                else:
+                    response = openai.ChatCompletion.create(
+                        model=self.config['llm']['gpt_model'],
+                        messages=device.messages,
+                        max_tokens=150,
+                    )
+                return (True, response)
+            except Exception as e:
+                device.log.error(f""Attempt {attempt+1} of {max_retries} failed: {e}"")
+                if attempt < max_retries - 1:
+                    time.sleep(wait_time)
+                    wait_time *= 2  # backoff
+                else:
+                    return (False, e)
+"
+2,MewCo-AI/ai_virtual_mate_comm,MewCo-AI,Organization,llm.py,https://github.com/MewCo-AI/ai_virtual_mate_comm,https://github.com/MewCo-AI/ai_virtual_mate_comm/blob/459d00bf6c9170d89a087f2db8c3b2140f192696/llm.py,Python,retry_logic,chatbot,4,0.95,"client.chat.completions.create with messages= The code snippet shows a language model call using OpenAI's chat completions API. It includes complex parsing logic, such as regex cleanup and try/except blocks around json.loads, which indicates pain in handling the structured output from the LLM. BAML would remove this need for retry loops and validation by providing a more robust and reliable way to handle the structured output.","BAML can automatically parse and validate the structured output from language models, eliminating the need for manual parsing, try/except blocks, and regex cleanup. It ensures that the output is correctly formatted and ready for use without additional code.",727,24,False,5.0,5.0,4.45,"This BAML rewrite removes manual parsing and retry loops, simplifying the code by leveraging a typed result class and function that directly return the parsed data.","// Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string) -> StepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = GenerateStep(user_input)
+title = result.title
+content = result.content
+next_action = result.next_action","This BAML rewrite assumes that the model will always return a valid JSON object with the expected fields. It also does not handle different models or base URLs, which are hardcoded in the original code.","This looked like an area where BAML could help simplify things. By automatically parsing and validating the structured output, you can eliminate manual parsing, try/except blocks, and regex cleanup. It would ensure that the output is correctly formatted and ready for use without additional code. What do you think about giving it a try?",helpful,"        elif llm_menu.get() == ""讯飞星火Lite"":
+            client = OpenAI(base_url=xf_url, api_key=xf_key)
+            openai_history.append({""role"": ""user"", ""content"": msg})
+            messages = [{""role"": ""system"", ""content"": prompt1}]
+            messages.extend(openai_history)
+            completion = client.chat.completions.create(model=xf_model, messages=messages)
+            openai_history.append({""role"": ""assistant"", ""content"": completion.choices[0].message.content})
+            return completion.choices[0].message.content
+        elif llm_menu.get() == ""本地Transformers"":
+            try:
+                client = OpenAI(base_url=f""http://{local_llm_ip}:{tf_port}/v1"", api_key=""transformers"")
+                openai_history.append({""role"": ""user"", ""content"": msg})
+                messages = [{""role"": ""system"", ""content"": prompt1}]
+                messages.extend(openai_history)
+                completion = client.chat.completions.create(model=tf_model, messages=messages, stream=False)
+                chunks = re.findall(r'^data:\s*(.+)$', completion, flags=re.MULTILINE)
+                result_content = []
+                for chunk in chunks:
+                    try:
+                        data = json.loads(chunk)
+                        content = data.get(""choices"", [{}])[0].get(""delta"", {}).get(""content"")
+                        if content is not None:
+                            result_content.append(content)
+                    except json.JSONDecodeError:
+                        continue
+                result_content = """".join(result_content).replace(""\n"", """")
+                openai_history.append({""role"": ""assistant"", ""content"": result_content})
+                res = result_content
+                if think_filter_switch == ""on"":
+                    res = res.split(""</think>"")[-1].strip()
+                return res
+            except Exception as e:
+                return f""本地Transformers服务未开启，错误详情：{e}""
+        elif llm_menu.get() == ""本地LM Studio"":
+            try:
+                client = OpenAI(base_url=f""http://{local_llm_ip}:{lmstudio_port}/v1"", api_key=""lm-studio"")
+                openai_history.append({""role"": ""user"", ""content"": msg})
+                messages = [{""role"": ""system"", ""content"": prompt1}]
+                messages.extend(openai_history)
+                completion = client.chat.completions.create(model="""", messages=messages)
+                openai_history.append({""role"": ""assistant"", ""content"": completion.choices[0].message.content})"
+3,cursor/eval,cursor,Organization,run.py,https://github.com/cursor/eval,https://github.com/cursor/eval/blob/20f1ae654a1a75d7c55f324f8b5b6a7f88b34953/run.py,Python,retry_logic,chatbot,5,1.0,"The snippet includes an explicit call to the OpenAI API using `openai.ChatCompletion.acreate(messages=prompt, model=model, temperature=temperature, max_tokens=1000, n=num_tries)`. The code demonstrates a clear pattern of retry logic around this LLM call. Specifically, it attempts to handle exceptions and retries up to 3 times with increasing sleep intervals. This type of brittleness is common when dealing with unreliable structured outputs from language models, as the model's response might occasionally be malformed or incomplete.","BAML would help by automating the retry logic, exception handling, and validation of the LLM output. It could also provide more sophisticated error detection and recovery mechanisms, reducing the need for manual intervention and improving the reliability of the structured data generated by the language model.",142,1079,False,1.0,4.5,4.35,"This BAML rewrite removes the manual retry logic and JSON parsing by defining a typed result class and a function that handles the client call. The generated client returns the parsed and validated result directly, eliminating the need for manual error handling and retries.","// Define the typed result as a BAML class
+class CompletionResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// Define a BAML function with a client and a prompt
+function GetCompletion(user_input: string, model: string) -> CompletionResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = b.GetCompletion(user_input, 'code-davinci-002')
+print(result.title)
+print(result.content)",This BAML rewrite assumes that the model will return a structured response in the expected format. It does not handle different models or additional parameters that may be required for certain models.,"This looked like an opportunity to simplify your retry logic and error handling. By using BAML, you could automate these processes, making your code cleaner and more reliable. I think it would be worth exploring how BAML could help streamline your workflow.",helpful,"    azure_prompt,
+    claude_prompt
+)
+from claude import claude_complete
+
+load_dotenv()
+
+HEADERS = {
+    ""Authorization"": f""Bearer {os.environ['OPENAI_API_KEY']}"",
+    ""Content-Type"": ""application/json"",
+}
+
+HUMAN_EVAL = os.environ['PWD'] + '/data/HumanEval.jsonl'
+OUT_FILE = os.environ['PWD'] + '/results/results-{}-{}.jsonl'
+
+async def retry(sem, fn):
+    for i in range(1, 3):
+        try:
+            async with sem:
+                return await fn()
+        except Exception as e:
+            print(e)
+            print('retrying')
+            time.sleep(0.3*i)
+
+    return await fn()
+
+async def get_completion(sem, prompt, num_tries=1, model='code-davinci-002', num_errors=0):
+    #print(num_tries)
+    if num_tries == 1:
+        temperature = 0.0
+    elif num_tries == 10:
+        temperature = 0.6
+    elif num_tries == 100:
+        temperature = 0.8
+    else:
+        raise ValueError(""num_tries must be 1, 10, or 100"")
+
+
+    if model in {'gpt-3.5-turbo', 'gpt-4'}:
+        completion = await retry(sem, lambda: openai.ChatCompletion.acreate(messages=prompt, model=model, temperature=temperature, max_tokens=1000, n=num_tries))"
+4,braintrustdata/autoevals,braintrustdata,Organization,js/ragas.ts,https://github.com/braintrustdata/autoevals,https://github.com/braintrustdata/autoevals/blob/f86168887c610bcb45b6cbaa377562992f7ba709/js/ragas.ts,Python,retry_logic,chatbot,4,0.95,"The code snippet shows an interaction with the OpenAI language model using `resp: OpenAI.Chat.Completions.ChatCompletion`. The pain is evident in the need for manual JSON parsing (`JSON.parse(toolCall.function.arguments)`) and the lack of robust error handling. This makes the code brittle, as it relies on the structure of the response being exactly as expected without any fallback mechanisms or validation.","BAML would help by providing a more reliable way to parse structured outputs from language models. It could automatically handle retries, validation, and cleanup, reducing the need for manual intervention and making the code more robust.",893,42,False,4.0,5.0,4.3,"This BAML rewrite removes the manual parsing and retry logic from the original code, allowing for cleaner and more reliable handling of structured output.","// Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string) -> StepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = GenerateStep(user_input)
+title = result.title
+content = result.content
+next_action = result.next_action","This BAML rewrite assumes that the OpenAI model will return a structured response with 'title', 'content', and 'next_action' fields. It also assumes that the client is correctly configured to handle the response format.","This looked like an opportunity to streamline your retry logic and structured output handling. BAML could help by automating retries, validation, and cleanup, making your code more robust without changing its core functionality. I think you'd find it useful.",helpful,"    }
+  }
+
+  // eslint-disable-next-line
+  return args as Record<string, any>;
+}
+
+function mustParseArgs(
+  resp: OpenAI.Chat.Completions.ChatCompletion,
+): Record<string, unknown> {
+  const toolCall = resp.choices[0]?.message.tool_calls?.[0];
+  if (!toolCall || toolCall.type !== ""function"") {
+    throw new Error(""No tool call returned"");
+  }
+
+  return JSON.parse(toolCall.function.arguments);
+}"
+5,tamikip/AI-GAL,tamikip,User,GPT.py,https://github.com/tamikip/AI-GAL,https://github.com/tamikip/AI-GAL/blob/8700d433112f4c32084474bec9ff55043d4e0c7b/GPT.py,Python,retry_logic,chatbot,5,0.95,"The code snippet includes a call to an LLM using `requests.post(gpt_url, headers=headers, data=payload)`, which suggests interaction with a language model. The subsequent parsing of the response with `json.loads(response.text)` and the use of regular expressions (`re.sub` and `re.search`) for cleanup indicate that there is significant brittleness in handling the structured output from the LLM. This includes retry logic, validation, and cleanup to ensure the JSON is correctly parsed and processed.","BAML would help by automating the process of retrying failed parses, validating the structure of the response, and cleaning up any unwanted text. This would reduce the need for manual intervention and make the code more robust and maintainable.",309,235,False,2.0,2.5,4.25,"This BAML rewrite removes manual JSON parsing and retry logic, simplifying the code by leveraging typed objects and automatic validation.","// 1. Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// 2. Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string) -> StepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = GenerateStep(user_input)
+title = result.title
+content = result.content
+next_action = result.next_action","This BAML rewrite assumes that the model will return a JSON object with 'title', 'content', and 'next_action' fields. It also assumes that the client is capable of handling and validating the response according to the defined class schema.","This looked like an opportunity to streamline your retry logic and structured output handling. BAML could help automate retries, validate responses, and clean up unwanted text, making the code more robust and maintainable without changing its core functionality.",helpful,"        })
+
+    messages.append({
+        ""role"": ""user"",
+        ""content"": prompt
+    })
+
+    payload = json.dumps({
+        ""model"": model,
+        ""temperature"": 0.8,
+        **({""response_format"": response_format} if json_mode else {}),
+        ""messages"": messages
+    })
+
+    response = requests.post(gpt_url, headers=headers, data=payload)
+    parsed_data = json.loads(response.text)
+    content = parsed_data['choices'][0]['message']['content']
+    # 去除思考模型的部分
+    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+    print(content)
+    # 为了防止不支持json格式的模型额外输出，利用正则提取json内容,原理是提取花括号
+    match = re.search(r'\{.*\}', content, re.DOTALL)
+    content = match.group(0) if match else content
+    return content
+
+
+def gpt_context(system, prompt, history):
+    """"""上下文模式的GPT对话函数""""""
+    gpt_url = config.get('CHATGPT', 'BASE_URL')
+    model = config.get('CHATGPT', 'model')
+
+    messages = [
+        {""role"": ""system"", ""content"": system},
+        {""role"": ""user"", ""content"": prompt}
+    ]
+
+    # 合并历史对话和当前对话
+    messages = history + messages
+
+    payload = json.dumps({
+        ""model"": model,"
+6,bigsk1/voice-chat-ai,bigsk1,User,cli.py,https://github.com/bigsk1/voice-chat-ai,https://github.com/bigsk1/voice-chat-ai/blob/6fc785a74e9db4391bbd1bbc95304e0623a4628b/cli.py,Python,retry_logic,chatbot,4,1.0,"The code snippet includes a call to an LLM using `requests.post(f'{OLLAMA_BASE_URL}/v1/chat/completions', headers=headers, json=payload, stream=True, timeout=30)`. The parsing logic involves multiple layers of error handling and retry attempts (`try/except` around `json.loads`, retry loops after parse failures). This indicates a significant amount of brittleness in handling LLM responses.","BAML would simplify this by automatically handling retries, validation, and cleanup of structured outputs from language models. It would eliminate the need for manual error handling and regex cleanup, making the code more robust and maintainable.",435,4,False,5.0,2.5,4.25,"This BAML rewrite removes the manual JSON parsing and retry logic from the original code, simplifying the process of handling the response from the chat model.","// 1. Define the typed result as a BAML class
+class ChatCompletionResponse {
+  choices array<Choice>
+}
+class Choice {
+  delta Delta
+}
+class Delta {
+  content string
+}
+
+// 2. Define a BAML function with a client and a prompt
+function GenerateChatCompletion(user_input: string) -> ChatCompletionResponse {
+  client ""xai/chat""
+  prompt #""""
+    You are an assistant that reasons step by step.
+    Return the choices array containing the content of each delta.
+
+    {{ user_input }}
+  ""#}
+}","result = GenerateChatCompletion(user_input)
+for choice in result.choices:
+  print(choice.delta.content)","This BAML rewrite assumes that the chat model's response format is consistent with the defined schema. It also does not handle errors or retries, as these are assumed to be managed by the client implementation.","This looked like a good opportunity to explore how BAML might simplify your retry logic and structured output handling. By automating retries, validation, and cleanup, you could make your code more robust and maintainable without changing its functionality.",helpful,"            ""options"": {
+                ""num_predict"": -2,
+                ""temperature"": 1.0
+            }
+        }
+        response = requests.post(f'{OLLAMA_BASE_URL}/v1/chat/completions', headers=headers, json=payload, stream=True, timeout=30)
+        response.raise_for_status()
+
+        full_response = """"
+        line_buffer = """"
+        for line in response.iter_lines(decode_unicode=True):
+            if line.startswith(""data:""):
+                line = line[5:].strip()  # Remove the ""data:"" prefix
+            if line:
+                try:
+                    chunk = json.loads(line)
+                    delta_content = chunk['choices'][0]['delta'].get('content', '')
+                    if delta_content:
+                        line_buffer += delta_content
+                        if '\n' in line_buffer:
+                            lines = line_buffer.split('\n')
+                            for line in lines[:-1]:
+                                if not is_xai_tts_enabled():
+                                    print(NEON_GREEN + line + RESET_COLOR)
+                                full_response += line + '\n'
+                            line_buffer = lines[-1]
+                except json.JSONDecodeError:
+                    continue
+        if line_buffer:
+            if not is_xai_tts_enabled():
+                print(NEON_GREEN + line_buffer + RESET_COLOR)
+            full_response += line_buffer
+        return full_response
+    
+    elif MODEL_PROVIDER == 'xai':
+        messages = [{""role"": ""system"", ""content"": system_message + ""\n"" + mood_prompt}] + model_history + [{""role"": ""user"", ""content"": user_input}]
+        headers = {
+            'Authorization': f'Bearer {XAI_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        payload = {"
+7,build-with-groq/g1,build-with-groq,Organization,g1.py,https://github.com/build-with-groq/g1,https://github.com/build-with-groq/g1/blob/854e6944e067ee46f71e138100b9779ae3448ace/g1.py,Python,retry_logic,chatbot,4,0.95,"The code snippet includes an LLM call (`client.chat.completions.create`) and demonstrates a pattern of retry logic around parsing the response with `json.loads`. This indicates that the developer is dealing with unreliable structured output from the language model, as the response might not always be in the expected format. BAML would help by automating the validation and repair of the LLM output, reducing the need for manual intervention and retry loops.","BAML can automatically validate and repair the structured output from the language model, ensuring that the response is correctly parsed without the need for manual `json.loads`, try/except blocks, or regex cleanup. This would streamline the process and reduce the brittleness of the code.",4185,136,False,3.0,5.0,4.15,"This BAML rewrite removes the manual parsing and retry logic from the original code, allowing for cleaner and more maintainable code. It leverages the typed object returned by the client directly.","// 1. Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// 2. Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string) -> StepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = GenerateStep(user_input)
+print(result.title)
+print(result.content)
+print(result.next_action)",This BAML rewrite assumes that the client will always return a valid StepResult object. It also does not handle any custom clients or response formats other than JSON.,"This looked like an area where BAML could simplify things. By automatically validating and repairing the structured output, you could streamline your process and reduce brittleness without needing manual `json.loads` or try/except blocks. What do you think about giving it a try?",helpful,"                response = client.chat.completions.create(
+                    model=""llama-3.3-70b-versatile"",
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=0.2,
+            ) 
+                return response.choices[0].message.content
+            else:
+                response = client.chat.completions.create(
+                    model=""llama-3.3-70b-versatile"",
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=0.2,
+                    response_format={""type"": ""json_object""}
+                )
+                return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            if attempt == 2:
+                if is_final_answer:
+                    return {""title"": ""Error"", ""content"": f""Failed to generate final answer after 3 attempts. Error: {str(e)}""}
+                else:
+                    return {""title"": ""Error"", ""content"": f""Failed to generate step after 3 attempts. Error: {str(e)}"", ""next_action"": ""final_answer""}
+            time.sleep(1)  # Wait for 1 second before retrying
+
+def generate_response(prompt, custom_client=None):
+    messages = [
+        {""role"": ""system"", ""content"": """"""You are an expert AI assistant that explains your reasoning step by step. For each step, provide a title that describes what you're doing in that step, along with the content. Decide if you need another step or if you're ready to give the final answer. Respond in JSON format with 'title', 'content', and 'next_action' (either 'continue' or 'final_answer') keys. USE AS MANY REASONING STEPS AS POSSIBLE. AT LEAST 3. BE AWARE OF YOUR LIMITATIONS AS AN LLM AND WHAT YOU CAN AND CANNOT DO. IN YOUR REASONING, INCLUDE EXPLORATION OF ALTERNATIVE ANSWERS. CONSIDER YOU MAY BE WRONG, AND IF YOU ARE WRONG IN YOUR REASONING, WHERE IT WOULD BE. FULLY TEST ALL OTHER POSSIBILITIES. YOU CAN BE WRONG. WHEN YOU SAY YOU ARE RE-EXAMINING, ACTUALLY RE-EXAMINE, AND USE ANOTHER APPROACH TO DO SO. DO NOT JUST SAY YOU ARE RE-EXAMINING. USE AT LEAST 3 METHODS TO DERIVE THE ANSWER. USE BEST PRACTICES.
+
+Example of a valid JSON response:
+```json
+{
+    ""title"": ""Identifying Key Information"",
+    ""content"": ""To begin solving this problem, we need to carefully examine the given information and identify the crucial elements that will guide our solution process. This involves..."",
+    ""next_action"": ""continue""
+}```
+""""""},
+        {""role"": ""user"", ""content"": prompt},
+        {""role"": ""assistant"", ""content"": ""Thank you! I will now think step by step following my instructions, starting at the beginning after decomposing the problem.""}
+    ]
+    
+    steps = []"
+8,evenboos/mcp-playground-local_clai,evenboos,User,app.py,https://github.com/evenboos/mcp-playground-local_clai,https://github.com/evenboos/mcp-playground-local_clai/blob/738351321a76ca86f111b6329abf91d6e75fef15/app.py,Python,retry_logic,chatbot,5,1.0,"The code snippet contains a call to `init_chat_model` with parameters such as `model=llm_model_name if use_local_model else model`, indicating an interaction with an LLM. The pain is evident in the subsequent try/except block where `json.loads(mcp_config_value)` is used, which could fail due to malformed JSON input from the LLM. This requires retry logic and exception handling, which BAML would simplify by automatically handling retries and ensuring reliable structured output.","BAML can help by automating the retry mechanism and robustly parsing the JSON response from the LLM, thereby removing the need for manual try/except blocks and retry loops. This would make the code cleaner, more maintainable, and less prone to errors related to unreliable structured output.",0,296,False,2.0,1.0,4.15,"This BAML rewrite removes the manual parsing and retry logic from the original code, allowing for cleaner and more maintainable code. It leverages the typed object returned by the client function to directly access the parsed data without needing additional parsing or error handling.","// Define the typed result as a BAML class
+class ChatbotStepResult {
+  title string
+  content []string
+  next_action ""continue"" | ""final_answer""
+}
+
+// Define a BAML function with a client and a prompt
+function GenerateChatbotStep(user_input: string, chatbot_value: [], bot_config: {}, user_config: {}) -> ChatbotStepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""You are an assistant that reasons step by step. Return the title, content, and next action.
+
+{{ user_input }}
+
+{{ ctx.output_format }}""#
+}","result = GenerateChatbotStep(user_input, chatbot_value, bot_config, user_config)
+title = result.title
+content = result.content
+next_action = result.next_action","This BAML rewrite assumes that the client function correctly handles and parses the response from the model. It also assumes that the context (user_input, chatbot_value, bot_config, user_config) is properly provided when calling the function.","This looked like an area where BAML could simplify things. By automating the retry mechanism and robustly parsing the JSON response, you could remove the need for manual try/except blocks and retry loops. This would make the code cleaner, more maintainable, and less prone to errors related to unreliable structured output.",helpful,"            dict(content=""user-message-content"")
+        })
+
+    chatbot_value.append({
+        ""role"": ""assistant"",
+        ""loading"": True,
+        ""content"": [],
+        ""header"": model.split(""/"")[1],
+        ""avatar"": bot_avatars.get(model, None),
+        ""status"": ""pending""
+    })
+    yield gr.update(
+        loading=True, value=None), gr.update(disabled=True), gr.update(
+            value=chatbot_value,
+            bot_config=bot_config(
+                disabled_actions=['edit', 'retry', 'delete']),
+            user_config=user_config(disabled_actions=['edit', 'delete']))
+    try:
+        prev_chunk_type = None
+        tool_name = """"
+        tool_args = """"
+        tool_content = """"
+        async for chunk in generate_with_mcp(
+                format_messages(chatbot_value[:-1]),
+                mcp_config=merge_mcp_config(json.loads(mcp_config_value),
+                                            internal_mcp_config),
+                enabled_mcp_servers=enabled_mcp_servers,
+                sys_prompt=sys_prompt,
+                get_llm=lambda: init_chat_model(
+                    model=llm_model_name if use_local_model else model,
+                    model_provider=""openai"",
+                    api_key=llm_api_key if use_local_model else api_key,
+                    base_url=llm_base_url if use_local_model else ""https://api-inference.modelscope.cn/v1/"")):
+            chatbot_value[-1][""loading""] = False
+            current_content = chatbot_value[-1][""content""]
+
+            if prev_chunk_type != chunk[""type""] and not (
+                    prev_chunk_type == ""tool_call_chunks""
+                    and chunk[""type""] == ""tool""):
+                current_content.append({})
+            prev_chunk_type = chunk[""type""]"
+9,metauto-ai/HGM,metauto-ai,Organization,llm.py,https://github.com/metauto-ai/HGM,https://github.com/metauto-ai/HGM/blob/013872d95da978483f5b540e531db063d23890da/llm.py,Python,retry_logic,chatbot,4,1.0,"client.chat.completions.create with messages= The code snippet shows a call to an LLM using client.chat.completions.create. It then attempts to parse the response content using json.loads, which can fail if the model output is not well-formed JSON. This pain is evident in the need for retry logic and validation around parsing model output.","BAML would help by automatically handling retries and validating the structured output from the LLM, thus removing the need for manual try/except blocks, regex cleanup, and hand-written validation.",385,97,False,3.0,4.5,4.15,"This BAML rewrite removes the manual JSON parsing and retry logic from the original code, making it more robust and easier to maintain.","// 1. Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// 2. Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string) -> StepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = GenerateStep(user_input)
+new_msg_history.append({""role"": ""assistant"", ""content"": result.content})","This BAML rewrite assumes that the client function correctly handles retries and error handling, which may not be the case in all scenarios. Additionally, it does not include any logic for handling different types of responses or errors from the model.","It looks like you're handling retries and structured output parsing manually, which can get quite repetitive. I was wondering if BAML could help streamline this process by automatically managing retries and validating the output from the LLM. This could reduce the amount of boilerplate code and make your code more maintainable. Would you be interested in exploring how BAML might fit into your workflow?",helpful,"        model=model,
+        messages=[
+            {""role"": ""system"", ""content"": system_message},
+            *new_msg_history,
+        ],
+        n=1,
+        stop=None,
+        seed=0,
+        response_format={
+            ""type"": ""json_object"",
+        },
+    )
+    content = response.choices[0].message.content
+    import json
+
+    content_json = json.loads(content)
+    new_msg_history = new_msg_history + [{""role"": ""assistant"", ""content"": content}]
+
+    return content_json, new_msg_history
+
+
+def get_response_from_llm(
+    msg,
+    client,
+    model,
+    system_message,
+    print_debug=False,
+    msg_history=None,
+    temperature=0.7,
+):
+    if msg_history is None:
+        msg_history = []
+
+    if model.startswith(""o""):
+        new_msg_history = msg_history + [
+            {""role"": ""user"", ""content"": system_message + msg}
+        ]
+        response = client.chat.completions.create(
+            model=model,
+            messages=new_msg_history,
+            temperature=1,"
+10,maschhoff/pdfscanexplorer,maschhoff,User,ai.py,https://github.com/maschhoff/pdfscanexplorer,https://github.com/maschhoff/pdfscanexplorer/blob/b47317cfdc98dc1627851175f8f46a15b17b56a7/ai.py,JavaScript,retry_logic,chatbot,4,0.95,"The snippet includes a call to `client.chat.completions.create` with messages, indicating interaction with a language model (LLM). The code then attempts to parse the response using `json.loads`, which is wrapped in a try/except block. This pattern indicates that there are issues with the reliability of the structured output from the LLM, as it may fail to parse correctly and requires fallback logic. BAML would help by automating the retry logic and validation around parsing LLM responses, thus removing this pain.","BAML can automate the process of retrying failed parses, validating the structure of the output, and cleaning up any necessary data. This would eliminate the need for manual try/except blocks and regex cleanup, making the code more robust and maintainable.",15,40,False,4.0,1.0,3.9,"This BAML rewrite removes manual JSON parsing and retry logic, simplifying the code by leveraging typed objects directly returned from the client.","// Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string) -> StepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = GenerateStep(user_input)
+print(result.title)
+print(result.content)
+print(result.next_action)",This BAML rewrite assumes that the model will always return a valid JSON object conforming to the StepResult schema. It also does not handle any context-specific logic or error handling beyond what is provided in the original code.,"This looked like an opportunity to streamline your retry logic and structured output handling. BAML could help automate retries, validate structure, and clean up data, making your code more robust and maintainable without changing its core functionality.",helpful,"        ""BEGIN PDF TEXT\n"" + pdf_text + ""\nEND PDF TEXT""
+    )
+
+    # Verwende chat.completions (kein file)
+    response = client.chat.completions.create(
+        model=""gpt-5"",
+        messages=[
+            {""role"": ""system"", ""content"": system_prompt},
+            {""role"": ""user"", ""content"": user_text}
+        ],
+    )
+
+    raw = response.choices[0].message.content.strip()
+    # Versuche JSON zu parsen
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        # Fallback: gib Raw zurück, damit du siehst, was das Modell ausgegeben hat
+        return {""raw"": raw}
+    return parsed
+
+# Beispiel
+# ordner = [""Rechnungen"", ""Versicherung"", ""Steuer"", ""Privat""]
+# print(categorize_document_local_text(""rechnung.pdf"", ordner))"
+11,jensroth-git/UnifiedAI,jensroth-git,User,openAI.ts,https://github.com/jensroth-git/UnifiedAI,https://github.com/jensroth-git/UnifiedAI/blob/a3a361a589ec901586251a2640f62ba2e0942edc/openAI.ts,TypeScript,retry_logic,chatbot,4,0.95,"The code snippet involves a call to an OpenAI language model using `client.chat.completions.create with messages=`. The pain is evident in the need for manual JSON parsing (`JSON.parse(functionCall.function.arguments)`) and error handling (`try/except` around parsing), which are common when dealing with unstructured output from LLMs. BAML would remove this need by automatically handling retries, validation, and cleanup of structured outputs.","BAML can automate the process of retrying failed parses, validating the structure of the output, and cleaning up any necessary data transformations. This would reduce the complexity and brittleness in the code, making it more reliable and maintainable.",0,84,False,4.0,1.0,3.9,This BAML rewrite removes the manual parsing and retry logic by defining a typed result class and a function that directly returns the parsed and validated object. This simplifies the code and eliminates the need for manual JSON parsing and error handling.,"// 1. Define the typed result as a BAML class
+class FunctionCallResult {
+  id string
+  name string
+  args map<string, any>
+}
+
+// 2. Define a BAML function with a client and a prompt
+function ExtractFunctionCall(messages: array<ChatCompletionMessageParam>) -> FunctionCallResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""""""
+    You are an assistant that processes chat completion messages.
+    Return the id, name, and arguments of the function call if present.
+
+    {{ messages }}
+
+    {{ ctx.output_format }}
+  """"#}
+}","result = ExtractFunctionCall(messages)
+if result.id:
+  baseMessages.push({
+    role: 'assistant',
+    functionCall: {
+      id: result.id,
+      name: result.name,
+      args: result.args,
+    }
+  })",This BAML rewrite assumes that the input messages are in a specific format and that the client is able to parse and validate the response according to the defined schema. It also does not handle cases where no function call is present.,"This looked like an area where BAML could simplify things. By automating retry logic, validating structure, and cleaning up data transformations, you could reduce complexity and brittleness in the code. I think a BAML rewrite could make it more reliable and maintainable.",helpful,"        const assistantMessage = message as ChatCompletionAssistantMessageParam;
+        if (assistantMessage.tool_calls &&
+            Array.isArray(assistantMessage.tool_calls) &&
+            assistantMessage.tool_calls.length > 0 &&
+            assistantMessage.tool_calls[0]) {
+          const toolCall =
+              assistantMessage.tool_calls[0] as ChatCompletionMessageToolCall;
+          if (toolCall.type === 'function') {
+            const functionCall =
+                toolCall as ChatCompletionMessageFunctionToolCall;
+            baseMessages.push({
+              role: 'assistant',
+              functionCall: {
+                id: functionCall.id,
+                name: functionCall.function.name,
+                args: JSON.parse(functionCall.function.arguments),
+              }
+            });
+          }
+        }
+      }
+      // check if function response
+      else if (message.role == 'tool') {
+        const toolMessage = message as ChatCompletionToolMessageParam;
+
+        // find name of tool with that id
+        const assistantMessage = addedMessages.find((historyMessage) => {
+          return historyMessage.role == 'assistant' &&
+              (historyMessage as ChatCompletionAssistantMessageParam)
+                  .tool_calls?.some(
+                      call => call.id === toolMessage.tool_call_id);
+        }) as ChatCompletionAssistantMessageParam |
+            undefined;
+
+        if (!assistantMessage || !assistantMessage.tool_calls?.[0]) {
+          console.error('Tool call not found in history');
+          continue;
+        }
+        const toolCall =
+            assistantMessage.tool_calls[0] as ChatCompletionMessageToolCall;
+        if (toolCall.type === 'function') {"
+12,tszdanger/CTFKnow,tszdanger,User,run.py,https://github.com/tszdanger/CTFKnow,https://github.com/tszdanger/CTFKnow/blob/26ab03c4de8652110cde3d03641151f42698d301/run.py,Python,retry_logic,extraction,4,1.0,"The snippet shows a call to 'client.chat.completions.create' with messages=, indicating an interaction with a language model. The code includes a try/except block around the parsing of the LLM response using json.loads, which is a common pain point when dealing with unreliable structured output from language models. This retry logic and exception handling suggest that the developer is already aware of the potential unreliability of the LLM's responses and is attempting to handle it manually.","BAML would help by automating the process of retrying failed requests, validating the structure of the response, and cleaning up any necessary data. This would reduce the amount of manual code needed for handling unreliable structured output from language models.",299,320,False,2.0,2.5,3.8,"This BAML rewrite removes the manual parsing and retry logic by defining a typed result class and a function that directly returns the parsed and validated object. This eliminates the need for json.loads, try/except blocks, and retry loops.","// Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string) -> StepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = GenerateStep(user_input)
+print(result.title)
+print(result.content)
+print(result.next_action)","This BAML rewrite assumes that the model will return a JSON object with the fields 'title', 'content', and 'next_action'. It also assumes that the client is correctly configured to handle the prompt and return the typed result.","This looked like a good opportunity to explore how BAML could simplify your retry logic. By automating retries, validating responses, and cleaning up data, you could reduce the amount of manual code needed for handling unreliable structured output from language models. I think this BAML rewrite removes the manual parsing and retry logic by defining a typed result class and a function that directly returns the parsed and validated object. This eliminates the need for json.loads, try/except blocks, and retry loops. What do you think?",helpful,"
+types = ['web', 'pwn', 'reverse', 'crypto', 'forensics', 'misc']
+
+class BashExperience:
+    """"""Extracting Bash Experience From NYU CTF Log files""""""
+
+    # May be not necessary
+    pass
+
+class Buildinit:
+    """"""Build an initial file list of the bench""""""
+    def __init__(self, list_file_name ,write_up_path = 'dataset/raw', data_file_name = 'dataset/data.json'):
+        self.write_up_path = write_up_path
+        self.data_file_name = data_file_name
+        self.list_file_name = list_file_name
+        self.alldata = json.loads(open(data_file_name, 'r').read())
+        self.result = []
+
+        self.year = {}
+        self.types = ['misc', 'crypto', 'web', 'reverse', 'forensics', 'pwn']
+    
+    def build(self):
+        # read all files in write_up_path, build key ""name"" using the filenames
+        print(""Start Building..."")
+        for file in tqdm(os.listdir(self.write_up_path)):
+
+            # read the write up file and judge the type.
+            write_up = ''
+            challange_type = ''
+            path = os.path.join(self.write_up_path, file)
+            with open(path, 'r', encoding=""utf-8"") as writeup_file:
+                write_up = writeup_file.read()
+            for type in types:
+                if type in write_up.lower():
+                    challange_type = type
+            
+            # if challange type is '', use LLM to determin
+            if challange_type == '':
+                try:
+                    response = client.chat.completions.create(
+                        messages=["
+13,deadlyjack/freight-forwarding,deadlyjack,User,lib/llm.ts,https://github.com/deadlyjack/freight-forwarding,https://github.com/deadlyjack/freight-forwarding/blob/2f551210e601886d5445640372116cac85e790fe/lib/llm.ts,TypeScript,retry_logic,chatbot,4,1.0,"The code snippet includes a call to `client.chat.completions.create with messages=` which is an LLM API call. The pain associated with this is the presence of retry logic and exponential backoff, as well as the need for JSON parsing (`response_format: { type: 'json_object' }`). BAML would remove the need for these by providing a more reliable structured output from the language model.","BAML would simplify the process by automatically handling retries and ensuring that the output is in a structured format, thereby removing the need for manual parsing and error handling.",1,114,False,3.0,1.0,3.8,"This BAML rewrite removes the manual retry logic and JSON parsing, simplifying the code by leveraging the typed object returned directly from the client.","// Define the typed result as a BAML class
+class LLMResponse {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// Define a BAML function with a client and a prompt
+function CallLLM(systemPrompt: string, userPrompt: string) -> LLMResponse {
+  client ""openai/gpt-4o-mini""
+  prompt #""""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    System Prompt:
+    {{ systemPrompt }}
+
+    User Prompt:
+    {{ userPrompt }}
+
+    {{ ctx.output_format }}
+  ""#}
+}","result = CallLLM(systemPrompt, userPrompt)
+console.log(result.title);
+console.log(result.content);",This BAML rewrite assumes that the client correctly handles retries and exponential backoff. It also assumes that the model's response format matches the expected output structure.,"This looked like an area where BAML could simplify things. By automating retries and ensuring structured output, you could reduce manual parsing and error handling. I think a BAML rewrite might make the code cleaner and more maintainable.",helpful,"
+const client = new OpenAI({
+	apiKey: process.env.LLM_API_KEY,
+	baseURL: process.env.LLM_API_BASE_URL,
+});
+
+const MAX_RETRIES = 3;
+const INITIAL_DELAY_MS = 1000;
+const MODEL = process.env.LLM_MODEL || ""llama-3.1-70b-versatile"";
+
+console.log(
+	`Using LLM provider: ${process.env.LLM_PROVIDER}, model: ${process.env.LLM_MODEL}`,
+);
+
+/**
+ * Call LLM API with retry logic and exponential backoff
+ */
+export default async function llm(
+	systemPrompt: string,
+	userPrompt: string,
+): Promise<RawExtraction | null> {
+	let lastError: Error | null = null;
+
+	for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+		try {
+			// console.log(""="".repeat(20));
+			// console.log(systemPrompt);
+			// console.log(""="".repeat(20));
+			// console.log(userPrompt);
+			// console.log(""="".repeat(20));
+			const requestOptions: OpenAI.Chat.ChatCompletionCreateParams = {
+				model: MODEL,
+				messages: [
+					{ role: ""system"", content: systemPrompt },
+					{ role: ""user"", content: userPrompt },
+				],
+				temperature: 0,
+				response_format: { type: ""json_object"" },
+			};
+
+			const response = await client.chat.completions.create(requestOptions);"
+14,hrishioa/lumentis,hrishioa,User,src/ai.ts,https://github.com/hrishioa/lumentis,https://github.com/hrishioa/lumentis/blob/15e8855eefed5e749ecd32d2521b8bab0fa01dda/src/ai.ts,TypeScript,retry_logic,extraction,4,0.95,"The code snippet includes a call to an OpenAI API with the function `callOpenAI(messages: GenericMessageParam[], options: AICallerOptions): Promise<AICallResponse>`. The parsing of the response involves manual JSON parsing (`JSON.parse(response)`), which is prone to errors. This manual parsing is further complicated by regex cleanup and potential retry logic, indicating a significant amount of brittleness in handling LLM output.","BAML would help remove the need for manual JSON parsing, regex cleanup, and retry logic. It would automatically handle the extraction and validation of structured outputs from language models, ensuring reliable and consistent results without the complexity and potential errors introduced by manual processing.",1696,458,False,1.0,3.0,3.65,"This BAML rewrite removes manual JSON parsing and retry loops, simplifying the code by leveraging typed objects and automatic validation.","// Define the typed result as a BAML class
+class AICallResponse {
+  full_message string
+  output_tokens int
+  input_tokens int
+}
+
+// Define a BAML function with a client and a prompt
+function CallOpenAI(messages: GenericMessageParam[], options: AICallerOptions) -> AICallResponse {
+  client ""openai/gpt-4o-mini""
+  prompt #""""
+    You are an assistant that handles the extraction of JSON responses from OpenAI.
+    Return the full_message, output_tokens, and input_tokens.
+
+    {{ messages }}
+    {{ options }}
+  ""#""
+}","result = CallOpenAI(messages, options)
+print(result.full_message)",This BAML rewrite assumes that the OpenAI client will return a properly formatted JSON response. It does not handle cases where the response might be malformed or incomplete.,"This looked like a great opportunity to simplify and streamline your code. BAML could help automate the extraction and validation of structured outputs, reducing manual JSON parsing and retry logic. It would make your code more reliable and easier to maintain. Would you be interested in exploring how BAML could improve this part of your project?",helpful,"        .replace(/```json/g, """")
+        .replace(/```/g, """")
+        .trim();
+    }
+  }
+
+  return {
+    fullMessage,
+    outputTokens,
+    inputTokens
+  };
+}
+
+// this function handles the two common ways I've seen OpenAI return JSON
+function extractArrayFromOpenAIResponse(response: string): string {
+  const respDict = JSON.parse(response);
+  const respKeys = Object.keys(respDict);
+  if (respKeys.length === 1) {
+    return JSON.stringify(respDict[respKeys[0]]);
+  } else {
+    const arr = respKeys.map((key) => respDict[key]);
+    return JSON.stringify(arr);
+  }
+}
+
+// TODO:
+// * `json_mode` doesn't really support continuance since it always returns proper JSON objects. Need to figure out how to handle that - json mode doesn't guarantee that it will actually finish the JSON object.
+async function callOpenAI(
+  messages: GenericMessageParam[],
+  options: AICallerOptions
+): Promise<AICallResponse> {
+  const {
+    model,
+    maxOutputTokens,
+    streamToConsole,
+    saveToFilepath,
+    apiKey,
+    prefix,
+    systemPrompt,
+    jsonType
+  } = options;"
+15,shibing624/open-o1,shibing624,User,o1.py,https://github.com/shibing624/open-o1,https://github.com/shibing624/open-o1/blob/3e38c286705369f2f45b0d79f9179fd2c74bf971/o1.py,Python,retry_logic,chatbot,4,0.95,"The code snippet includes a call to `client.chat.completions.create` with messages, indicating interaction with a language model. The pain is evident in the nested try/except block around `json.loads(r)`, which handles JSON parsing errors by returning raw content and suggesting next actions. This pattern of retrying or validating LLM responses manually is common and can be simplified with BAML.","BAML would automate the handling of structured outputs from language models, removing the need for manual parsing, error handling, and validation logic. It could streamline the process by intelligently managing retries, cleaning up text, and validating responses based on predefined schemas.",115,499,False,1.0,2.5,3.6,"This BAML rewrite removes manual JSON parsing and retry logic, simplifying the code by leveraging the typed object returned directly from the client.","// Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action ""continue"" | ""final_answer""
+}
+
+// Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string, max_tokens: int, is_final_answer: bool) -> StepResult {
+  client ""openai/gpt-4o-mini""
+  prompt #""
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  ""#
+}","result = GenerateStep(user_input, max_tokens, is_final_answer)
+print(result.title)
+print(result.content)
+print(result.next_action)",This BAML rewrite assumes that the client 'openai/gpt-4o-mini' will always return a valid StepResult object. It also does not handle any context-specific details that may be required for the prompt.,"This looked like an area where BAML could simplify things. By automating retries, cleaning up text, and validating responses based on schemas, you could streamline the process quite a bit. I think this could make your code cleaner and more maintainable.",helpful,"    :param max_tokens:
+    :param is_final_answer:
+    :return:
+    """"""
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=1.0,
+            response_format={""type"": ""json_object""}
+        )
+        r = response.choices[0].message.content
+
+        try:
+            return json.loads(r)
+        except json.JSONDecodeError:
+            # If parsing fails, return the content as is
+            return {
+                ""title"": ""Raw Response"",
+                ""content"": r,
+                ""next_action"": ""final_answer"" if is_final_answer else ""continue""
+            }
+    except Exception as e:
+        error_message = f""Failed to generate {'final answer' if is_final_answer else 'step'}. Error: {str(e)}""
+        return {""title"": ""Error"", ""content"": error_message, ""next_action"": ""final_answer""}
+
+
+def cot_response_stream(prompt):
+    """"""
+    Generate reasoning steps for a given prompt using the CoT method. stream mode.
+    messages:
+    ```json
+    {
+        ""messages"": [
+            {
+                ""role"": ""system"",
+                ""content"": ""你是一个专家级的人工智能助手，逐步解释你的推理过程。每一步都提供一个标题，描述你在该步骤中所做的事情，并附上内容。
+                决定是否需要另一步，或者是否准备好给出最终答案。以JSON格式回应，包含'title'、'content'和'next_action'（'continue'或'final_answer'）键。
+                尽可能使用多个推理步骤，至少3个。注意你作为大型语言模型的局限性，以及你能做和不能做的事情。在推理中，探索替代答案。
+                考虑到你可能是错误的，如果你的推理有误，指出错误的地方。全面测试所有其他可能性。你可能会错。当你说你在重新审视时，"
+16,danneu/telegram-chatgpt-bot,danneu,User,openai.ts,https://github.com/danneu/telegram-chatgpt-bot,https://github.com/danneu/telegram-chatgpt-bot/blob/1cb33eab190f00089b4513042f605865ce769ffe/openai.ts,TypeScript,retry_logic,chatbot,4,0.95,"The code snippet includes an explicit call to `openai.createChatCompletion`, which is a language model (LLM) call. The subsequent parsing of the response using `JSON.parse` indicates that there is manual handling of potential errors, such as retry loops and validation logic. This suggests that the developer is dealing with unreliable structured output from the LLM.","BAML would help by automating the process of handling retries, validation, and cleanup around the LLM response, thus reducing the brittleness in the code and improving its reliability.",38,1114,False,1.0,2.0,3.55,"This BAML rewrite removes the manual JSON parsing and retry logic from the original code, allowing for cleaner and more maintainable code.","// 1. Define the typed result as a BAML class
+class ChatResponse {
+  content string
+}
+
+// 2. Define a BAML function with a client and a prompt
+function FetchChatResponse(messages: db.Message[], temperature: number, model: 'gpt-3.5-turbo' | 'gpt-4') -> ChatResponse {
+  client ""openai/gpt-4""
+  prompt #""\n    You are an assistant that generates a chat response based on the provided messages and temperature.\n    Return the content of the response.\n    \n    {{ messages }}\n    \n    Temperature: {{ temperature }}\n    Model: {{ model }}\n  ""#
+}","const result = await FetchChatResponse(messages, temperature, model);
+console.log(result.content);",This BAML rewrite assumes that the OpenAI client will return a JSON object with a 'choices' field containing the response content. It also assumes that the messages are formatted in a way that is compatible with the OpenAI API.,"This looked like an area where BAML could potentially simplify and streamline your code. By automating retries, validation, and cleanup around the LLM response, you could achieve cleaner and more maintainable code without changing its functionality.",helpful,"    )
+
+    // @ts-expect-error: Not sure how to annotate the fact that data is async iterator.
+    for await (const chunk of response.data) {
+        const lines = chunk
+            .toString('utf8')
+            .split('\n')
+            .filter((line: string) => line.trim().startsWith('data: '))
+
+        for (const line of lines) {
+            const message = line.replace(/^data: /, '')
+            if (message === '[DONE]') {
+                return
+            }
+
+            const json = JSON.parse(message)
+            const token = json.choices[0].delta.content
+            if (typeof token === 'string' && token.length > 0) {
+                yield token
+            }
+        }
+    }
+}
+
+module.exports.fetchChatResponse = async function (
+    messages: db.Message[],
+    temperature: number,
+    model: 'gpt-3.5-turbo' | 'gpt-4',
+) {
+    console.log(
+        `[fetchChatResponse] making chatgpt request with ${
+            messages.length - 1
+        } history answers and 1 user prompt. (temp=${temperature.toFixed(1)})`,
+    )
+    const start = Date.now()
+    const response = await openai.createChatCompletion(
+        {
+            model,
+            messages,
+            temperature, // 0 to 2.0, anything about 1.0 is nonsense
+        },"

@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "fix_summary": { "type": "string" },
+    "baml_schema_or_function": { "type": "string" },
+    "example_client_usage": { "type": "string" },
+    "limits": { "type": "string" }
+  },
+  "required": [
+    "fix_summary",
+    "baml_schema_or_function",
+    "example_client_usage",
+    "limits"
+  ]
+}

@@ -1,0 +1,21 @@
+You are writing a short, helpful, NON-SALESY outreach message to a
+developer whose public code shows structured-output pain that BAML could
+simplify.
+
+Rules for tone:
+- Do NOT say their code is wrong or bad.
+- Do NOT overstate or make strong claims.
+- Sound like a helpful engineer who noticed a real pattern.
+- Use soft language like "I noticed" or "this looked like".
+- Make exactly one concrete point about what you observed.
+- End with one soft, low-pressure call to action.
+- Keep the message UNDER 120 words.
+
+Context for you (do not paste all of this into the message):
+Repository: {repo_full_name}
+Observed pain type: {pain_type}
+What BAML may help with: {why_baml_may_help}
+Short fix idea: {fix_summary}
+
+Write the message so it could plausibly be sent after a human review.
+Return ONLY a JSON object that matches the required schema.

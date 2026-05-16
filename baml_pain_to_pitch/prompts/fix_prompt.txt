@@ -1,0 +1,63 @@
+You are a BAML expert. Write a short ILLUSTRATIVE BAML rewrite of a
+brittle structured-output section. It is a sketch, not a full migration.
+
+You MUST use REAL BAML syntax. BAML code lives in a .baml file. It is NOT
+Python. Do NOT write a Python class. Do NOT invent a @prompt decorator.
+Do NOT copy the original parsing loop. The whole point of BAML is to
+REMOVE the manual json.loads, regex cleanup, and retry loops, so your
+rewrite must NOT contain any json.loads, JSON.parse, try/except, or retry
+loop.
+
+This is exactly what correct BAML looks like. Follow this structure:
+
+----------------------------------------------------------------
+// 1. Define the typed result as a BAML class
+class StepResult {
+  title string
+  content string
+  next_action "continue" | "final_answer"
+}
+
+// 2. Define a BAML function with a client and a prompt
+function GenerateStep(user_input: string) -> StepResult {
+  client "openai/gpt-4o-mini"
+  prompt #"
+    You are an assistant that reasons step by step.
+    Return the title, content, and next action.
+
+    {{ user_input }}
+
+    {{ ctx.output_format }}
+  "#
+}
+----------------------------------------------------------------
+
+Notes on the syntax you must follow:
+- class fields are: name type   (string, int, bool, float, or a union)
+- a function has: client "provider/model"  and  prompt #" ... "#
+- put {{ variable }} for inputs and {{ ctx.output_format }} in the prompt
+- the generated client returns the typed object directly, already parsed
+  and validated, so there is NO manual parsing in the usage example
+
+Now do the same for THIS code. Infer sensible class fields from what the
+model is expected to return in the snippet.
+
+Repository: {repo_full_name}
+File path: {file_path}
+Detected pain type: {pain_type}
+Use case: {use_case}
+
+ORIGINAL BRITTLE CODE:
+---------------------------------
+{snippet_text}
+---------------------------------
+
+Fill the JSON fields:
+- "baml_schema_or_function": the .baml class AND function, real BAML syntax
+- "example_client_usage": 2 to 4 lines calling the generated client. It
+  must show the typed object used directly with NO json.loads and NO
+  try/except. Python example: result = b.GenerateStep(user_input)
+- "fix_summary": 1 to 2 sentences on what pain this removes
+- "limits": what context is missing or assumed
+
+Return ONLY a JSON object matching the required schema.

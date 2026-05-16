@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "properties": {
+    "is_baml_relevant": { "type": "boolean" },
+    "pain_score": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "pain_type": {
+      "type": "string",
+      "enum": [
+        "malformed_json",
+        "retry_logic",
+        "regex_cleanup",
+        "schema_validation",
+        "output_parser",
+        "other"
+      ]
+    },
+    "use_case": {
+      "type": "string",
+      "enum": ["extraction", "agent", "chatbot", "RAG", "evaluation", "unknown"]
+    },
+    "evidence": { "type": "string" },
+    "why_baml_may_help": { "type": "string" }
+  },
+  "required": [
+    "is_baml_relevant",
+    "pain_score",
+    "confidence",
+    "pain_type",
+    "use_case",
+    "evidence",
+    "why_baml_may_help"
+  ]
+}

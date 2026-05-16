@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "subject_or_opening": { "type": "string" },
+    "message": { "type": "string" },
+    "tone_check": {
+      "type": "string",
+      "enum": ["helpful", "too salesy", "too technical"]
+    }
+  },
+  "required": ["subject_or_opening", "message", "tone_check"]
+}
