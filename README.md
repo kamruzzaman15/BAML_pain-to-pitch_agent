@@ -4,10 +4,6 @@ A lightweight GTM agent for **BAML** (by Boundary). It finds developers who
 already have the exact pain BAML solves, then drafts a code-specific outreach
 message for them.
 
-> Built for the Basis Set Ventures AI Fellow project, Track 2 (Agentic GTM).
-> Chosen company: BAML, which was my number one ranked company in the
-> prioritization task.
-
 ---
 
 ## The idea in one line
