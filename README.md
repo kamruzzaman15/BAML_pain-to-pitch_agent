@@ -1,6 +1,6 @@
 # BAML Pain-to-Pitch Agent
 
-A lightweight GTM agent for **BAML** (by Boundary). It finds developers who
+A lightweight GTM agent for **BAML** (by Boundary [https://boundaryml.com/]). It finds developers who
 already have the exact pain BAML solves, then drafts a code-specific outreach
 message for them.
 
