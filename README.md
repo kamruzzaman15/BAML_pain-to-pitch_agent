@@ -152,14 +152,6 @@ drafted a short outreach message that points at this exact pattern. See
 - The no-LLM guard is a heuristic. It favors precision over recall on
   purpose. It is better to show a few real leads than many noisy ones.
 
-## What I would improve with more time
-
-- Use a stronger model for the rewrite step only.
-- Force schema fields to be inferred strictly from the snippet.
-- Add GitHub issue and discussion mining, not only code search.
-- Deduplicate by company.
-- Add a feedback loop where human review updates the ranking rubric.
-
 ---
 
 ## How it was built
